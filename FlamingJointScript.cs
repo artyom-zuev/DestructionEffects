@@ -1,76 +1,76 @@
 using System;
 using UnityEngine;
+using System.Collections.Generic;
 
 namespace DestructionEffects
 {
 	public class FlamingJointScript : MonoBehaviour
 	{
-		float maxCombineDistance = 0.6f;
+        private float maxCombineDistance = 0.6f;
+        private float shrinkRateSmoke = 1f;
+        private float shrinkRateFlame = 0.35f;
+        private float highestEnergy = 0;
+        private float destroyTimerStart = 0;
+        private GameObject destroyer;
 		
-		float shrinkRateSmoke = 1f;
-		float shrinkRateFlame = 0.35f;
-		
-		float highestEnergy = 0;
-		float destroyTimerStart = 0;
-		GameObject destroyer;
-		
-		public void Start()
+		public void Start ()
 		{
-			foreach(GameObject otherFlame in FlamingJoints.flameObjects)
-			{
-				if((gameObject.transform.position-otherFlame.transform.position).sqrMagnitude < (maxCombineDistance * maxCombineDistance))	
+            List<GameObject> flameObjects = FlamingJoints.flameObjects;
+            for (int i = 0; i < flameObjects.Count; ++i)
+            {
+                if ((gameObject.transform.position - flameObjects[i].transform.position).sqrMagnitude < (maxCombineDistance * maxCombineDistance))	
 				{
-					Debug.Log ("== Flame combined ==");
-					Destroy(gameObject);
+					if (FlamingJoints.log) 
+                        Debug.Log ("DE | FlamingJointScript | Start () | Flame was combined");
+					Destroy (gameObject);
 					return;
 				}
 			}
-					
-			foreach(var pe in gameObject.GetComponentsInChildren<KSPParticleEmitter>())
-			{
-				Color color = pe.material.color;
-				color.a = color.a/2;
-				pe.material.SetColor("_TintColor", color);
-				pe.force = -FlightGlobals.getGeeForceAtPosition(transform.position)/3;
-				if(pe.maxEnergy > highestEnergy)
+            KSPParticleEmitter[] emitters = gameObject.GetComponentsInChildren<KSPParticleEmitter> ();
+            for (int i = 0; i < emitters.Length; ++i)
+            {
+                Material material = emitters[i].material;
+                Color color = material.color;
+				color.a = color.a / 2f;
+                material.SetColor ("_TintColor", color);
+
+                emitters[i].force = -FlightGlobals.getGeeForceAtPosition (transform.position) / 3f;
+                if (emitters[i].maxEnergy > highestEnergy)
 				{
-					destroyer = pe.gameObject;
-					highestEnergy = pe.maxEnergy;
+                    destroyer = emitters[i].gameObject;
+                    highestEnergy = emitters[i].maxEnergy;
 				}
 			}
-			FlamingJoints.flameObjects.Add(gameObject);
-			
+			FlamingJoints.flameObjects.Add (gameObject);
 		}
 		
-		public void FixedUpdate()
+		public void FixedUpdate ()
 		{
-			foreach(var pe in gameObject.GetComponentsInChildren<KSPParticleEmitter>())
-			{
-				float shrinkRate = pe.gameObject.name.Contains("smoke") ? shrinkRateSmoke : shrinkRateFlame;
-				pe.maxSize = Mathf.MoveTowards(pe.maxSize, 0, shrinkRate * Time.fixedDeltaTime);
-				pe.minSize = Mathf.MoveTowards(pe.minSize, 0, shrinkRate * Time.fixedDeltaTime);
-				if(pe.maxSize < 0.1f && pe.gameObject == destroyer && destroyTimerStart == 0)
-				{
-					destroyTimerStart = Time.time;	
-				}
-				
-				if(pe.gameObject.GetComponent<Light>())
-				{
-					pe.gameObject.GetComponent<Light>().intensity = UnityEngine.Random.Range(0f, pe.maxSize/6);
-				}
-			}
-			
-			
-			
-			if(destroyTimerStart != 0 && Time.time-destroyTimerStart > highestEnergy)
+            KSPParticleEmitter[] emitters = gameObject.GetComponentsInChildren<KSPParticleEmitter>();
+            for (int i = 0; i < emitters.Length; ++i)
+            {
+                float shrinkRate = emitters[i].gameObject.name.Contains ("smoke") ? shrinkRateSmoke : shrinkRateFlame;
+                emitters[i].maxSize = Mathf.MoveTowards (emitters[i].maxSize, 0, shrinkRate * Time.fixedDeltaTime);
+                emitters[i].minSize = Mathf.MoveTowards (emitters[i].minSize, 0, shrinkRate * Time.fixedDeltaTime);
+                if (emitters[i].maxSize < 0.1f && emitters[i].gameObject == destroyer && destroyTimerStart == 0)
+                {
+                    destroyTimerStart = Time.time;
+                }
+                Light light = emitters[i].gameObject.GetComponent<Light> ();
+                if (light != null)
+                {
+                    light.intensity = UnityEngine.Random.Range (0f, emitters[i].maxSize / 6f);
+                }
+            }
+			if (destroyTimerStart != 0 && Time.time - destroyTimerStart > highestEnergy)
 			{
 				GameObject.Destroy(gameObject);
 			}
 		}
 		
-		void OnDestroy()
+		private void OnDestroy ()
 		{
-			if(FlamingJoints.flameObjects.Contains(gameObject))
+			if (FlamingJoints.flameObjects.Contains(gameObject))
 			{
 				FlamingJoints.flameObjects.Remove(gameObject);	
 			}
